@@ -1,4 +1,4 @@
-import { modFox, modScene } from "./ui";
+import { modFox, modScene, togglePoopBag } from "./ui";
 import {
   RAIN_CHANCE,
   SCENES,
@@ -9,12 +9,15 @@ import {
   getNextPoopTime,
 } from "./constants";
 
+// using a disconnected timer from endCelebrate for the poop bag anim is required to avoid a bug when transitioning to night time during celebration
+
 const gameState = {
   current: "INIT",
   clock: 1,
   wakeTime: -1,
   sleepTime: -1,
   hungryTime: -1,
+  poopTime: -1,
   timeToStartCelebrating: -1,
   timeToEndCelebrating: -1,
   dieTime: -1,
@@ -35,6 +38,8 @@ const gameState = {
       this.startCelebrating();
     } else if (this.clock === this.timeToEndCelebrating) {
       this.endCelebrating();
+    } else if (this.clock === this.poopTime) {
+      this.poop();
     }
 
     return this.clock;
@@ -61,6 +66,7 @@ const gameState = {
     this.wakeTime = this.clock + NIGHT_LENGTH;
     modFox("sleep");
     modScene("night");
+    this.scene = 2;
   },
   getHungry() {
     this.current = "HUNGRY";
@@ -69,7 +75,14 @@ const gameState = {
     modFox("hungry");
   },
   cleanUpPoop() {
-    console.log("clean poop");
+    if (this.current != "POOPING") {
+      return;
+    } else {
+      this.startCelebrating();
+      this.dieTime = -1;
+      this.hungryTime = getNextHungerTime(this.clock);
+      togglePoopBag(true);
+    }
   },
   feed() {
     if (this.current != "HUNGRY") {
@@ -92,6 +105,7 @@ const gameState = {
     this.current = "IDLING";
     this.timeToEndCelebrating = -1;
     this.determineFoxState();
+    togglePoopBag(false);
   },
   determineFoxState() {
     if (this.current === "IDLING") {
@@ -101,6 +115,12 @@ const gameState = {
         modFox("rain");
       }
     }
+  },
+  poop() {
+    this.current = "POOPING";
+    this.poopTime = -1;
+    this.dieTime = getNextDieTime(this.clock);
+    modFox("pooping");
   },
   die() {
     console.log("wasted");
@@ -130,16 +150,17 @@ const gameState = {
     }
   },
   changeWeather() {
-    // let gameElement = document.querySelector(".game");
-    // if (this.weather === "day") {
-    //   this.weather = "night";
-    //   gameElement.classList.toggle("day", false);
-    //   gameElement.classList.toggle("night", true);
-    // } else {
-    //   this.weather = "day";
-    //   gameElement.classList.toggle("day", true);
-    //   gameElement.classList.toggle("night", false);
-    // }
+    if (SCENES[this.scene] === "night") {
+      return;
+    } else if (this.scene === 0) {
+      this.scene = 1;
+      modScene(SCENES[this.scene]);
+      this.determineFoxState();
+    } else if (this.scene === 1) {
+      this.scene = 0;
+      modScene(SCENES[this.scene]);
+      this.determineFoxState();
+    }
   },
 };
 
